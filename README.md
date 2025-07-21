@@ -1,73 +1,101 @@
-# Welcome to your Lovable project
+# Centro Juvenil Don Bosco - Sistema de Asistencia NFC
 
-## Project info
+Sistema móvil para gestión de asistencia mediante tarjetas NFC en el Centro Juvenil Don Bosco.
 
-**URL**: https://lovable.dev/projects/dd829d0b-ae91-4d1b-b446-85a57a4305e9
+## Características
 
-## How can I edit this code?
+- **Autenticación con Sanctum**: Login y registro seguro con tokens JWT
+- **Gestión de dispositivos**: Registro automático de UUID de dispositivos
+- **Listado de personas**: Filtrado por tipo y edad
+- **Asociación NFC**: Vincular tarjetas NFC a personas registradas
+- **Escaneo NFC**: Registrar entrada/salida mediante tarjetas NFC
+- **Validaciones de seguridad**: Solo funciona con usuarios logueados y dispositivos autorizados
 
-There are several ways of editing your application.
+## Tecnologías
 
-**Use Lovable**
+- React + TypeScript
+- Vite
+- Tailwind CSS + shadcn/ui
+- Capacitor (para funcionalidades nativas)
+- Axios para comunicación con API
+- React Router para navegación
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/dd829d0b-ae91-4d1b-b446-85a57a4305e9) and start prompting.
+## API Endpoints
 
-Changes made via Lovable will be committed automatically to this repo.
+La aplicación se conecta a la API en: `https://centrojuvenildonbosco.org/api`
 
-**Use your preferred IDE**
+### Autenticación
+- `POST /login` - Iniciar sesión
+- `POST /register` - Registrar usuario
+- `GET /me` - Obtener datos del usuario actual
+- `POST /logout` - Cerrar sesión
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Dispositivos
+- `POST /devices/register` - Registrar dispositivo
+- `GET /devices` - Listar dispositivos
+- `POST /devices/{id}/deactivate` - Desactivar dispositivo
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Funcionalidades principales (requieren autenticación y dispositivo autorizado)
+- `GET /personas` - Listar personas
+- `POST /personas/{id}/asociar-nfc` - Asociar tarjeta NFC
+- `GET /nfc/{uid}` - Consultar tarjeta NFC
+- `POST /asistencias` - Registrar asistencia
 
-Follow these steps:
+## Desarrollo
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+```bash
+# Instalar dependencias
+npm install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Ejecutar en modo desarrollo
 npm run dev
+
+# Construir para producción
+npm run build
 ```
 
-**Edit a file directly in GitHub**
+## Generar APK para Android
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. **Exportar proyecto a GitHub**
+   - Usar el botón "Export to Github" en Lovable
+   - Clonar el repositorio en tu máquina local
 
-**Use GitHub Codespaces**
+2. **Configurar Capacitor**
+   ```bash
+   npm install
+   npx cap init
+   npx cap add android
+   npx cap update android
+   ```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+3. **Construir y sincronizar**
+   ```bash
+   npm run build
+   npx cap sync
+   ```
 
-## What technologies are used for this project?
+4. **Generar APK**
+   ```bash
+   npx cap run android
+   ```
+   Esto abrirá Android Studio donde podrás generar el APK.
 
-This project is built with:
+## Funcionalidades NFC
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Para desarrollo web, el sistema simula el comportamiento NFC. En dispositivos móviles con Capacitor, se integra con `@capacitor-community/nfc` para funcionalidad NFC real.
 
-## How can I deploy this project?
+### Flujo de uso:
+1. **Login/Registro**: Usuario se autentica en el sistema
+2. **Asociar NFC**: Escanear tarjeta y asociarla a una persona
+3. **Registrar asistencia**: Escanear tarjeta para marcar entrada/salida
 
-Simply open [Lovable](https://lovable.dev/projects/dd829d0b-ae91-4d1b-b446-85a57a4305e9) and click on Share -> Publish.
+## Seguridad
 
-## Can I connect a custom domain to my Lovable project?
+- Tokens JWT para autenticación
+- UUID único por dispositivo
+- Validación de dispositivos autorizados
+- Headers de seguridad en todas las requests (`X-Device-UUID`)
 
-Yes, you can!
+---
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Desarrollado para el Centro Juvenil Don Bosco
