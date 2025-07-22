@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Frontend Animadores v2</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+        button { margin: 5px; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Test Frontend - Filtro Animadores v2</h1>
+    
+    <div class="test-section">
+        <h2>Pruebas de Endpoint</h2>
+        <button onclick="testHijos()">Probar Hijos</button>
+        <button onclick="testAnimadores()">Probar Animadores</button>
+        <button onclick="testSinAuth()">Probar Sin Autenticación</button>
+        <button onclick="testConAuth()">Probar Con Autenticación</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Información del Navegador</h2>
+        <div id="browser-info"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Resultados</h2>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://centrojuvenildonbosco.org/api';
+        
+        // Mostrar información del navegador
+        document.getElementById('browser-info').innerHTML = `
+            <p><strong>User Agent:</strong> ${navigator.userAgent}</p>
+            <p><strong>URL Actual:</strong> ${window.location.href}</p>
+            <p><strong>Protocolo:</strong> ${window.location.protocol}</p>
+        `;
+        
+        async function testHijos() {
+            await testEndpoint('hijo', 'Hijos', true);
+        }
+        
+        async function testAnimadores() {
+            await testEndpoint('animador', 'Animadores', true);
+        }
+        
+        async function testSinAuth() {
+            await testEndpoint('animador', 'Animadores (Sin Auth)', false);
+        }
+        
+        async function testConAuth() {
+            await testEndpoint('animador', 'Animadores (Con Auth)', true);
+        }
+        
+        async function testEndpoint(tipo, nombre, conAuth) {
+            const resultDiv = document.getElementById('result');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            resultDiv.innerHTML += `<hr><h3>${timestamp} - ${nombre}</h3>`;
+            
+            try {
+                const params = new URLSearchParams({
+                    tipo: tipo,
+                    page: '1'
+                });
+                
+                const url = `${API_BASE}/personas?${params}`;
+                console.log('URL:', url);
+                resultDiv.innerHTML += `<p class="info">URL: ${url}</p>`;
+                
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                };
+                
+                if (conAuth) {
+                    headers['Authorization'] = 'Bearer test-token';
+                    headers['X-Device-UUID'] = 'test-device';
+                }
+                
+                console.log('Headers:', headers);
+                resultDiv.innerHTML += `<p class="info">Headers: ${JSON.stringify(headers, null, 2)}</p>`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: headers
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                resultDiv.innerHTML += `<p class="info">Status: ${response.status} ${response.statusText}</p>`;
+                
+                // Mostrar headers de respuesta
+                const responseHeaders = {};
+                response.headers.forEach((value, key) => {
+                    responseHeaders[key] = value;
+                });
+                resultDiv.innerHTML += `<p class="info">Response Headers: ${JSON.stringify(responseHeaders, null, 2)}</p>`;
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    resultDiv.innerHTML += `<p class="error">Error ${response.status}: ${errorText}</p>`;
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                resultDiv.innerHTML += `
+                    <p class="success">✅ Éxito!</p>
+                    <p><strong>Total:</strong> ${data.pagination.total}</p>
+                    <p><strong>Página actual:</strong> ${data.pagination.current_page}</p>
+                    <p><strong>Personas en esta página:</strong> ${data.data.length}</p>
+                    <h4>Personas encontradas:</h4>
+                    <ul>
+                        ${data.data.map(persona => `
+                            <li>${persona.nombre} ${persona.apellido} (${persona.tipo}) - ${persona.edad} años</li>
+                        `).join('')}
+                    </ul>
+                    <details>
+                        <summary>Ver respuesta completa</summary>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </details>
+                `;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML += `<p class="error">❌ Error: ${error.message}</p>`;
+                resultDiv.innerHTML += `<pre>${error.stack}</pre>`;
+            }
+        }
+        
+        // Auto-ejecutar prueba básica al cargar
+        window.addEventListener('load', () => {
+            console.log('Página cargada, ejecutando prueba básica...');
+            setTimeout(() => testSinAuth(), 1000);
+        });
+    </script>
+</body>
+</html> 
