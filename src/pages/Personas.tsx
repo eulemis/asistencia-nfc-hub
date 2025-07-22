@@ -53,9 +53,9 @@ const Personas: React.FC = () => {
 
   const getTipoColor = (tipo: string) => {
     switch (tipo) {
-      case 'niño': return 'bg-blue-100 text-blue-800';
-      case 'joven': return 'bg-green-100 text-green-800';
-      case 'adulto': return 'bg-purple-100 text-purple-800';
+      case 'hijo': return 'bg-blue-100 text-blue-800';
+      case 'animador': return 'bg-green-100 text-green-800';
+
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -102,9 +102,8 @@ const Personas: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos los tipos</SelectItem>
-                  <SelectItem value="niño">Niños</SelectItem>
-                  <SelectItem value="joven">Jóvenes</SelectItem>
-                  <SelectItem value="adulto">Adultos</SelectItem>
+                  <SelectItem value="hijo">Niños</SelectItem>
+                  <SelectItem value="animador">Animadores</SelectItem>
                 </SelectContent>
               </Select>
               

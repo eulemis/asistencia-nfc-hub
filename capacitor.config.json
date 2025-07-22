@@ -1,0 +1,10 @@
+{
+  "appId": "app.lovable.dd829d0bae914d1bb44685a57a4305e9",
+  "appName": "Centro Juvenil Don Bosco",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  }
+}

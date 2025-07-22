@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Centro Juvenil Don Bosco</string>
+    <string name="title_activity_main">Centro Juvenil Don Bosco</string>
+    <string name="package_name">app.lovable.dd829d0bae914d1bb44685a57a4305e9</string>
+    <string name="custom_url_scheme">app.lovable.dd829d0bae914d1bb44685a57a4305e9</string>
+</resources>

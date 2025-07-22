@@ -35,13 +35,22 @@ api.interceptors.request.use(
     const token = localStorage.getItem('auth-token');
     const uuid = await getDeviceUUID();
     
+    console.log('Request interceptor - Token:', token ? 'Present' : 'Missing');
+    console.log('Request interceptor - UUID:', uuid);
+    console.log('Request URL:', config.url);
+    console.log('Request method:', config.method);
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('Authorization header set');
     }
     
     if (uuid) {
       config.headers['X-Device-UUID'] = uuid;
+      console.log('X-Device-UUID header set:', uuid);
     }
+    
+    console.log('Final headers:', config.headers);
     
     return config;
   },
@@ -50,8 +59,20 @@ api.interceptors.request.use(
 
 // Interceptor para manejar respuestas de error
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('Response success:', response.status, response.config.url);
+    return response;
+  },
   (error) => {
+    console.log('Response error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: error.config?.url,
+      method: error.config?.method,
+      headers: error.config?.headers,
+      data: error.response?.data
+    });
+    
     if (error.response?.status === 401) {
       localStorage.removeItem('auth-token');
       localStorage.removeItem('user-data');

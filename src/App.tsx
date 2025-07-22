@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import RegisterDevice from "./pages/RegisterDevice";
 import Personas from "./pages/Personas";
 import AsociarNFC from "./pages/AsociarNFC";
 import EscanearNFC from "./pages/EscanearNFC";
@@ -55,6 +56,7 @@ const App = () => (
             <Route path="/" element={<Navigate to="/personas" replace />} />
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+            <Route path="/register-device" element={<PublicRoute><RegisterDevice /></PublicRoute>} />
             <Route path="/personas" element={<ProtectedRoute><Personas /></ProtectedRoute>} />
             <Route path="/asociar-nfc" element={<ProtectedRoute><AsociarNFC /></ProtectedRoute>} />
             <Route path="/escanear-nfc" element={<ProtectedRoute><EscanearNFC /></ProtectedRoute>} />

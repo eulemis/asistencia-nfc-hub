@@ -69,7 +69,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string): Promise<void> => {
     try {
       setLoading(true);
-      const response = await api.post('/login', { email, password });
+      
+      // Configurar headers con el UUID del dispositivo
+      const headers = {};
+      if (deviceUUID) {
+        headers['X-Device-UUID'] = deviceUUID;
+        console.log('Sending device UUID:', deviceUUID);
+      } else {
+        console.log('No device UUID available');
+      }
+      
+      const response = await api.post('/login', { 
+        email, 
+        password,
+        device_name: 'Mobile App'
+      }, { headers });
       
       const { token: authToken, user: userData } = response.data;
       
@@ -79,15 +93,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setToken(authToken);
       setUser(userData);
       
-      // Registrar dispositivo después del login
-      await registerDevice();
-      
       toast({
         title: "Login exitoso",
         description: "Has iniciado sesión correctamente",
       });
     } catch (error: any) {
       const message = error.response?.data?.message || 'Error al iniciar sesión';
+      console.log('Login error:', error.response?.data);
       toast({
         title: "Error",
         description: message,
@@ -102,6 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (name: string, email: string, password: string, passwordConfirmation: string): Promise<void> => {
     try {
       setLoading(true);
+      
       const response = await api.post('/register', {
         name,
         email,
@@ -116,9 +129,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       setToken(authToken);
       setUser(userData);
-      
-      // Registrar dispositivo después del registro
-      await registerDevice();
       
       toast({
         title: "Registro exitoso",
