@@ -48,7 +48,7 @@ const PersonaCard: React.FC<PersonaCardProps> = ({ persona, onVincularNfc }) => 
                 {persona.nombre} {persona.apellido}
               </h3>
             </div>
-            
+
             <div className="text-sm text-muted-foreground space-y-1">
               <p>Edad: {persona.edad} años</p>
               {persona.telefono && <p>Teléfono: {persona.telefono}</p>}

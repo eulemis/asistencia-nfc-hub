@@ -2,29 +2,31 @@ import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { FiltroEdad } from '@/types';
 
-interface FiltroEdadSelectorProps {
-  value: string;
-  onValueChange: (value: string) => void;
+interface FiltroEdadProps {
+  filtrosEdad: FiltroEdad[];
+  valorSeleccionado: string;
+  onCambio: (valor: string) => void;
+  placeholder?: string;
+  className?: string;
 }
 
-const FiltroEdadSelector: React.FC<FiltroEdadSelectorProps> = ({ value, onValueChange }) => {
-  const rangosEdad: FiltroEdad[] = [
-    { label: '8 a 9 años', edad_min: 8, edad_max: 9 },
-    { label: '10 a 11 años', edad_min: 10, edad_max: 11 },
-    { label: '12 a 13 años', edad_min: 12, edad_max: 13 },
-    { label: '14 a 17 años', edad_min: 14, edad_max: 17 },
-  ];
-
+const FiltroEdad: React.FC<FiltroEdadProps> = ({
+  filtrosEdad,
+  valorSeleccionado,
+  onCambio,
+  placeholder = "Filtrar por edad",
+  className = ""
+}) => {
   return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger>
-        <SelectValue placeholder="Filtrar por edad" />
+    <Select value={valorSeleccionado} onValueChange={onCambio}>
+      <SelectTrigger className={className}>
+        <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="todos">Todas las edades</SelectItem>
-        {rangosEdad.map((rango) => (
-          <SelectItem key={rango.edad_min} value={`${rango.edad_min}-${rango.edad_max}`}>
-            {rango.label}
+        <SelectItem value="sin-filtro">Todas las edades</SelectItem>
+        {filtrosEdad.map((filtro) => (
+          <SelectItem key={filtro.label} value={`${filtro.edad_min}-${filtro.edad_max}`}>
+            {filtro.label}
           </SelectItem>
         ))}
       </SelectContent>
@@ -32,4 +34,4 @@ const FiltroEdadSelector: React.FC<FiltroEdadSelectorProps> = ({ value, onValueC
   );
 };
 
-export default FiltroEdadSelector; 
+export default FiltroEdad; 

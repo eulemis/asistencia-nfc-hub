@@ -15,7 +15,7 @@ interface NfcScannerProps {
   personaNombre?: string;
 }
 
-const NfcScanner: React.FC<NfcScannerProps> = ({ 
+const NfcScanner: React.FC<NfcScannerProps> = ({
   isOpen, 
   onClose, 
   onNfcDetected, 
@@ -177,11 +177,7 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
       onNfcDetected(uidToUse.trim());
       onClose();
     } else {
-      toast({
-        title: "Error",
-        description: "Debes ingresar un UID válido",
-        variant: "destructive",
-      });
+      setError('Por favor, ingresa un UID válido');
     }
   };
 
@@ -193,16 +189,41 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
   };
 
   const handleManualSubmit = () => {
-    if (manualUid.trim()) {
+    if (manualUid && manualUid.trim()) {
       onNfcDetected(manualUid.trim());
       onClose();
     } else {
-      toast({
-        title: "Error",
-        description: "Debes ingresar un UID válido",
-        variant: "destructive",
-      });
+      setError('Por favor, ingresa un UID válido');
     }
+  };
+
+  // Función para manejar errores de NFC ya vinculado
+  const handleNfcError = (error: any) => {
+    console.error('Error NFC:', error);
+    
+    // Verificar si es un error de NFC ya vinculado
+    if (error?.response?.data?.errors?.nfc_uid || 
+        error?.message?.includes('ya ha sido usado') ||
+        error?.message?.includes('already been used')) {
+      
+      toast({
+        title: "Tarjeta NFC ya vinculada",
+        description: "Esta tarjeta NFC ya está asociada a otra persona.",
+        variant: "destructive",
+        className: "bg-yellow-50 border-yellow-200 text-yellow-800",
+      });
+      
+      setError('Esta tarjeta NFC ya está vinculada a otra persona');
+      return;
+    }
+    
+    // Otros errores
+    let errorMessage = 'Error al procesar la tarjeta NFC';
+    if (error?.message) {
+      errorMessage = error.message;
+    }
+    
+    setError(errorMessage);
   };
 
   return (
@@ -316,26 +337,16 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
                   <div>
                     <h3 className="font-semibold">Escanear NFC</h3>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Elige el método de escaneo
+                      Acerca la tarjeta NFC al dispositivo
                     </p>
                   </div>
                   <div className="space-y-2">
-                    {nfcSupported && (
-                      <Button onClick={startWebScanning} className="w-full" variant="default">
-                        <Nfc className="w-4 h-4 mr-2" />
-                        NFC Web (Recomendado)
-                      </Button>
-                    )}
                     {nativeNfcAvailable && (
-                      <Button onClick={startNativeScanning} className="w-full" variant="outline">
+                      <Button onClick={startNativeScanning} className="w-full bg-blue-500 hover:bg-blue-600">
                         <Zap className="w-4 h-4 mr-2" />
                         NFC Nativo
                       </Button>
                     )}
-                    <Button onClick={() => setShowManualInput(true)} className="w-full" variant="outline">
-                      <Key className="w-4 h-4 mr-2" />
-                      Ingresar Manualmente
-                    </Button>
                   </div>
                 </div>
               )}

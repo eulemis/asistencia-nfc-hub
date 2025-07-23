@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, Users, Nfc, ScanLine } from 'lucide-react';
+import { LogOut, Users, Nfc, ScanLine, Clock } from 'lucide-react';
 
 const Navigation: React.FC = () => {
   const { user, logout } = useAuth();
@@ -15,6 +15,7 @@ const Navigation: React.FC = () => {
     { path: '/personas', label: 'Personas', icon: Users },
     { path: '/asociar-nfc', label: 'Asociar NFC', icon: Nfc },
     { path: '/escanear-nfc', label: 'Escanear NFC', icon: ScanLine },
+    { path: '/asistencias', label: 'Asistencias', icon: Clock },
   ];
 
   const handleLogout = async () => {
@@ -32,7 +33,7 @@ const Navigation: React.FC = () => {
         </Button>
       </div>
       
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;

@@ -1,43 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Grupo } from '@/types';
-import api from '@/lib/axios';
+import type { Grupo } from '@/types';
 
 interface GrupoSelectorProps {
-  value: string;
-  onValueChange: (value: string) => void;
+  grupos: Grupo[];
+  valorSeleccionado: string;
+  onCambio: (valor: string) => void;
+  placeholder?: string;
+  className?: string;
+  isLoading?: boolean;
 }
 
-const GrupoSelector: React.FC<GrupoSelectorProps> = ({ value, onValueChange }) => {
-  const [grupos, setGrupos] = useState<Grupo[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    cargarGrupos();
-  }, []);
-
-  const cargarGrupos = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/grupos');
-      setGrupos(response.data);
-    } catch (error) {
-      console.error('Error cargando grupos:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+const GrupoSelector: React.FC<GrupoSelectorProps> = ({
+  grupos,
+  valorSeleccionado,
+  onCambio,
+  placeholder = "Seleccionar grupo",
+  className = "",
+  isLoading = false
+}) => {
   return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger>
-        <SelectValue placeholder={loading ? "Cargando grupos..." : "Filtrar por grupo"} />
+    <Select value={valorSeleccionado} onValueChange={onCambio} disabled={isLoading}>
+      <SelectTrigger className={className}>
+        <SelectValue placeholder={isLoading ? "Cargando grupos..." : placeholder} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="todos">Todos los grupos</SelectItem>
+        <SelectItem value="sin-filtro">Todos los grupos</SelectItem>
         {grupos.map((grupo) => (
           <SelectItem key={grupo.id} value={grupo.id.toString()}>
-            {grupo.nombre} ({grupo.personas_count})
+            {grupo.nombre} ({grupo.personas_count} personas)
           </SelectItem>
         ))}
       </SelectContent>

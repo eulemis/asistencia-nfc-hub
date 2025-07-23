@@ -11,6 +11,7 @@ import RegisterDevice from "./pages/RegisterDevice";
 import Personas from "./pages/Personas";
 import AsociarNFC from "./pages/AsociarNFC";
 import EscanearNFC from "./pages/EscanearNFC";
+import Asistencias from "./pages/Asistencias";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,6 +61,7 @@ const App = () => (
             <Route path="/personas" element={<ProtectedRoute><Personas /></ProtectedRoute>} />
             <Route path="/asociar-nfc" element={<ProtectedRoute><AsociarNFC /></ProtectedRoute>} />
             <Route path="/escanear-nfc" element={<ProtectedRoute><EscanearNFC /></ProtectedRoute>} />
+            <Route path="/asistencias" element={<ProtectedRoute><Asistencias /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
