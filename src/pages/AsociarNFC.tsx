@@ -4,17 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Persona } from '@/types';
 import api from '@/lib/axios';
 import { nfcManager, NfcScanResult } from '@/lib/nfc';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Nfc, CheckCircle, XCircle, Search } from 'lucide-react';
+import { Loader2, Nfc, CheckCircle, Search, Smartphone } from 'lucide-react';
 
 const AsociarNFC: React.FC = () => {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [personaSeleccionada, setPersonaSeleccionada] = useState<string>('');
-  const [uidManual, setUidManual] = useState('');
+  const [uidCapturado, setUidCapturado] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [lastScanResult, setLastScanResult] = useState<string | null>(null);
@@ -47,6 +46,7 @@ const AsociarNFC: React.FC = () => {
     try {
       setScanning(true);
       setLastScanResult(null);
+      setUidCapturado('');
       
       const isSupported = await nfcManager.isSupported();
       if (!isSupported) {
@@ -58,11 +58,12 @@ const AsociarNFC: React.FC = () => {
         return;
       }
 
-      const result: NfcScanResult = await nfcManager.startScan();
+      console.log('Iniciando escaneo NFC nativo...');
+      const result: NfcScanResult = await nfcManager.startScan('native');
       
       if (result.success && result.uid) {
         setLastScanResult(result.uid);
-        setUidManual(result.uid);
+        setUidCapturado(result.uid);
         toast({
           title: "Tarjeta detectada",
           description: `UID: ${result.uid}`,
@@ -87,10 +88,10 @@ const AsociarNFC: React.FC = () => {
   };
 
   const asociarNFC = async () => {
-    if (!personaSeleccionada || !uidManual) {
+    if (!personaSeleccionada || !uidCapturado) {
       toast({
         title: "Error",
-        description: "Selecciona una persona y proporciona un UID",
+        description: "Selecciona una persona y escanea una tarjeta NFC",
         variant: "destructive",
       });
       return;
@@ -99,7 +100,7 @@ const AsociarNFC: React.FC = () => {
     try {
       setLoading(true);
       await api.post(`/personas/${personaSeleccionada}/asociar-nfc`, {
-        nfc_uid: uidManual
+        nfc_uid: uidCapturado
       });
 
       toast({
@@ -109,7 +110,7 @@ const AsociarNFC: React.FC = () => {
 
       // Limpiar formulario y recargar personas
       setPersonaSeleccionada('');
-      setUidManual('');
+      setUidCapturado('');
       setLastScanResult(null);
       await cargarPersonas();
     } catch (error: any) {
@@ -155,6 +156,17 @@ const AsociarNFC: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Información del dispositivo */}
+            <div className="p-3 rounded-lg border border-blue-200 bg-blue-50">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-blue-600" />
+                <div>
+                  <p className="font-medium text-blue-800">NFC Nativo (Android)</p>
+                  <p className="text-sm text-blue-600">Usa el plugin nativo para capturar el UID físico</p>
+                </div>
+              </div>
+            </div>
+
             {/* Escaneo NFC */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">1. Escanear Tarjeta NFC</h3>
@@ -162,7 +174,7 @@ const AsociarNFC: React.FC = () => {
               <Button 
                 onClick={iniciarEscaneo} 
                 disabled={scanning}
-                className="w-full"
+                className="w-full bg-blue-500 hover:bg-blue-600"
                 size="lg"
               >
                 {scanning ? (
@@ -186,17 +198,6 @@ const AsociarNFC: React.FC = () => {
                   </span>
                 </div>
               )}
-
-              {/* UID Manual */}
-              <div className="space-y-2">
-                <Label htmlFor="uidManual">UID de la tarjeta (manual)</Label>
-                <Input
-                  id="uidManual"
-                  value={uidManual}
-                  onChange={(e) => setUidManual(e.target.value.toUpperCase())}
-                  placeholder="Ingresa el UID manualmente"
-                />
-              </div>
             </div>
 
             {/* Selección de persona */}
@@ -239,7 +240,7 @@ const AsociarNFC: React.FC = () => {
             {/* Botón de asociación */}
             <Button 
               onClick={asociarNFC}
-              disabled={!personaSeleccionada || !uidManual || loading}
+              disabled={!personaSeleccionada || !uidCapturado || loading}
               className="w-full"
               size="lg"
             >

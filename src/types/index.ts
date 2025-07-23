@@ -85,3 +85,5 @@ export interface FiltroTipoPersona {
   label: string;
   value: string;
 }
+
+export type NfcScanType = 'native' | 'web';

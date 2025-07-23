@@ -3,18 +3,15 @@ import Navigation from '@/components/Navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { NfcData, Asistencia } from '@/types';
 import api from '@/lib/axios';
 import { nfcManager, NfcScanResult } from '@/lib/nfc';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Nfc, CheckCircle, XCircle, Search, Clock, User } from 'lucide-react';
+import { Loader2, Nfc, CheckCircle, XCircle, Search, Clock, User, Smartphone } from 'lucide-react';
 
 const EscanearNFC: React.FC = () => {
   const [scanning, setScanning] = useState(false);
   const [nfcData, setNfcData] = useState<NfcData | null>(null);
-  const [uidManual, setUidManual] = useState('');
   const [registrandoAsistencia, setRegistrandoAsistencia] = useState(false);
   const { toast } = useToast();
 
@@ -33,10 +30,10 @@ const EscanearNFC: React.FC = () => {
         return;
       }
 
-      const result: NfcScanResult = await nfcManager.startScan();
+      console.log('Iniciando escaneo NFC nativo...');
+      const result: NfcScanResult = await nfcManager.startScan('native');
       
       if (result.success && result.uid) {
-        setUidManual(result.uid);
         await consultarNFC(result.uid);
       } else {
         toast({
@@ -125,19 +122,6 @@ const EscanearNFC: React.FC = () => {
     }
   };
 
-  const consultarManual = async () => {
-    if (!uidManual.trim()) {
-      toast({
-        title: "Error",
-        description: "Ingresa un UID válido",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    await consultarNFC(uidManual.trim().toUpperCase());
-  };
-
   const formatearFecha = (fecha: string) => {
     return new Date(fecha).toLocaleString('es-ES', {
       day: '2-digit',
@@ -176,12 +160,23 @@ const EscanearNFC: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Información del dispositivo */}
+            <div className="p-3 rounded-lg border border-blue-200 bg-blue-50">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-blue-600" />
+                <div>
+                  <p className="font-medium text-blue-800">NFC Nativo (Android)</p>
+                  <p className="text-sm text-blue-600">Usa el plugin nativo para capturar el UID físico</p>
+                </div>
+              </div>
+            </div>
+
             {/* Escaneo automático */}
             <div className="space-y-4">
               <Button 
                 onClick={iniciarEscaneo} 
                 disabled={scanning}
-                className="w-full"
+                className="w-full bg-blue-500 hover:bg-blue-600"
                 size="lg"
               >
                 {scanning ? (
@@ -196,22 +191,6 @@ const EscanearNFC: React.FC = () => {
                   </>
                 )}
               </Button>
-            </div>
-
-            {/* Consulta manual */}
-            <div className="space-y-2">
-              <Label htmlFor="uidManual">Consultar UID manualmente</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="uidManual"
-                  value={uidManual}
-                  onChange={(e) => setUidManual(e.target.value.toUpperCase())}
-                  placeholder="Ingresa el UID"
-                />
-                <Button onClick={consultarManual} variant="outline">
-                  Consultar
-                </Button>
-              </div>
             </div>
 
             {/* Datos de la persona */}
