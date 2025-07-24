@@ -76,6 +76,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('auth-token');
       localStorage.removeItem('user-data');
+      localStorage.removeItem('device-id');
       window.location.href = '/login';
     }
     return Promise.reject(error);

@@ -15,6 +15,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   deviceUUID: string | null;
+  deviceId: number | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, passwordConfirmation: string) => Promise<void>;
@@ -41,6 +42,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('auth-token'));
   const [deviceUUID, setDeviceUUID] = useState<string | null>(null);
+  const [deviceId, setDeviceId] = useState<number | null>(() => {
+    const stored = localStorage.getItem('device-id');
+    return stored ? parseInt(stored) : null;
+  });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -85,13 +90,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         device_name: 'Mobile App'
       }, { headers });
       
-      const { token: authToken, user: userData } = response.data;
+      const { token: authToken, user: userData, device_id, device_name } = response.data;
       
       localStorage.setItem('auth-token', authToken);
       localStorage.setItem('user-data', JSON.stringify(userData));
+      localStorage.setItem('device-id', device_id?.toString() || '');
       
       setToken(authToken);
       setUser(userData);
+      setDeviceId(device_id);
+      
+      console.log('Login successful - Device ID:', device_id);
       
       toast({
         title: "Login exitoso",
@@ -155,8 +164,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       localStorage.removeItem('auth-token');
       localStorage.removeItem('user-data');
+      localStorage.removeItem('device-id');
       setToken(null);
       setUser(null);
+      setDeviceId(null);
       
       toast({
         title: "Sesión cerrada",
@@ -204,6 +215,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     token,
     deviceUUID,
+    deviceId,
     loading,
     login,
     register,

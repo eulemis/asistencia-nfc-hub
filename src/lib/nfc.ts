@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { scanNfcNative, scanNfcWeb, isNfcAvailable } from './nfc-native';
+import { scanNfcNative, isNfcAvailable } from './nfc-native';
 
 export interface NfcTag {
   id: string;
@@ -13,7 +13,7 @@ export interface NfcScanResult {
   error?: string;
 }
 
-export type NfcScanType = 'native' | 'web';
+export type NfcScanType = 'native';
 
 class NFCManager {
   private _isSupported = false;
@@ -68,8 +68,7 @@ class NFCManager {
         // Usar plugin nativo para Android
         uid = await scanNfcNative();
       } else {
-        // Usar Web NFC API para web
-        uid = await scanNfcWeb();
+        throw new Error('Tipo de escaneo no soportado');
       }
       
       console.log('UID capturado exitosamente:', uid);
@@ -105,16 +104,16 @@ class NFCManager {
     });
   }
 
-  // Obtener información del dispositivo NFC
   getNfcInfo() {
     return {
       platform: Capacitor.getPlatform(),
       isNative: Capacitor.isNativePlatform(),
-      nfcAvailable: this._nfcAvailable,
       isSupported: this._isSupported,
-      isEnabled: this._isEnabled
+      isEnabled: this._isEnabled,
+      nfcAvailable: this._nfcAvailable
     };
   }
 }
 
+// Exportar una instancia singleton
 export const nfcManager = new NFCManager();

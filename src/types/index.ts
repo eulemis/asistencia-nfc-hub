@@ -23,6 +23,21 @@ export interface Persona {
   activo: boolean;
   created_at: string;
   updated_at: string;
+  // Nueva información de asistencia
+  asistencia?: {
+    fecha: string;
+    tiene_entrada: boolean;
+    tiene_salida: boolean;
+    completa: boolean;
+    hora_entrada?: string;
+    hora_salida?: string;
+    registros: {
+      id: number;
+      tipo: 'entrada' | 'salida';
+      fecha_hora: string;
+      ubicacion?: string;
+    }[];
+  };
 }
 
 export interface Grupo {

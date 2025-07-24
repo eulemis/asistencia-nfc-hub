@@ -13,6 +13,7 @@ import NfcScannerAsistencia from '@/components/NfcScannerAsistencia';
 import PersonaModal from '@/components/PersonaModal';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   Search, 
   Calendar, 
@@ -27,12 +28,17 @@ import {
 
 const Asistencias: React.FC = () => {
   // Estados principales
-  const [asistencias, setAsistencias] = useState<Asistencia[]>([]);
+  const [asistencias, setAsistencias] = useState<Persona[]>([]);
   const [loading, setLoading] = useState(true);
   const [registrandoAsistencia, setRegistrandoAsistencia] = useState(false);
   
   // Estados de filtros
-  const [filtroFecha, setFiltroFecha] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [filtroFecha, setFiltroFecha] = useState<string>(() => {
+    // Usar la fecha de ayer por defecto para mostrar datos de prueba
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1);
+    return ayer.toISOString().split('T')[0];
+  });
   const [filtroEdad, setFiltroEdad] = useState<string>('sin-filtro');
   const [filtroGrupo, setFiltroGrupo] = useState<string>('sin-filtro');
   const [busqueda, setBusqueda] = useState('');
@@ -47,6 +53,7 @@ const Asistencias: React.FC = () => {
   const [loadingGrupos, setLoadingGrupos] = useState(false);
   
   const { toast } = useToast();
+  const { deviceId } = useAuth();
 
   // Filtros de edad predefinidos
   const filtrosEdad: FiltroEdad[] = [
@@ -82,10 +89,11 @@ const Asistencias: React.FC = () => {
       }
       if (busqueda) params.append('busqueda', busqueda);
 
-      const response = await api.get(`/asistencias?${params.toString()}`);
+      // Usar la nueva ruta para obtener asistencias
+      const response = await api.get(`/asistencias?${params.toString()}&tipo=hijo`);
       
       // Validar y extraer datos de la respuesta
-      let asistenciasData: Asistencia[] = [];
+      let asistenciasData: Persona[] = [];
       if (response.data) {
         if (Array.isArray(response.data)) {
           asistenciasData = response.data;
@@ -140,11 +148,15 @@ const Asistencias: React.FC = () => {
 
   const handleNfcScanSuccess = async (uid: string) => {
     try {
-      // Consultar persona por UID NFC
-      const response = await api.get(`/persona-por-nfc/${uid}`);
+      // Encriptar el UID para mayor seguridad
+      const encryptedUid = btoa(uid); // Base64 encoding
       
-      if (response.data.persona) {
-        setPersonaDetectada(response.data.persona);
+      // Usar la ruta GET existente con UID encriptado
+      const response = await api.get(`/persona-por-nfc/${encryptedUid}`);
+      
+      // La API devuelve los datos directamente, no dentro de un objeto persona
+      if (response.data && response.data.id) {
+        setPersonaDetectada(response.data);
         setShowPersonaModal(true);
       } else {
         toast({
@@ -164,21 +176,42 @@ const Asistencias: React.FC = () => {
     }
   };
 
-  const handleConfirmarAsistencia = async (tipo: 'entrada' | 'salida') => {
+  const handleConfirmarAsistencia = async () => {
     if (!personaDetectada) return;
+    
+    if (!deviceId) {
+      toast({
+        title: "Error",
+        description: "No se pudo identificar el dispositivo. Por favor, inicia sesión nuevamente.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setRegistrandoAsistencia(true);
       
-      await api.post('/asistencias', {
+      // Formato de fecha compatible con MySQL
+      const now = new Date();
+      const fechaHora = now.toISOString().slice(0, 19).replace('T', ' ');
+      
+      const asistenciaData = {
         persona_id: personaDetectada.id,
-        tipo: tipo,
-        nfc_uid: personaDetectada.nfc_uid
-      });
+        dispositivo_id: deviceId,
+        fecha_hora: fechaHora,
+        ubicacion: 'Centro Juvenil Don Bosco'
+      };
+      
+      console.log('Registrando asistencia con datos:', asistenciaData);
+      
+      const response = await api.post('/asistencias', asistenciaData);
+      
+      // Obtener el tipo determinado por el backend
+      const tipoDeterminado = response.data.tipo_determinado || 'entrada';
 
       toast({
         title: "Asistencia registrada",
-        description: `${tipo.charAt(0).toUpperCase() + tipo.slice(1)} registrada para ${personaDetectada.nombre} ${personaDetectada.apellido}`,
+        description: `${tipoDeterminado.charAt(0).toUpperCase() + tipoDeterminado.slice(1)} registrada para ${personaDetectada.nombre} ${personaDetectada.apellido}`,
       });
 
       // Recargar asistencias y limpiar estado
@@ -209,23 +242,58 @@ const Asistencias: React.FC = () => {
     });
   };
 
-  const getAsistenciaColor = (tipo: string) => {
-    return tipo === 'entrada' 
-      ? 'bg-green-100 text-green-800 border-green-200' 
-      : 'bg-red-100 text-red-800 border-red-200';
+  const formatearHora = (hora: string | undefined | null) => {
+    if (!hora) return 'N/A';
+    try {
+      // Si la hora ya está en formato h:mm A (12 horas), la devolvemos tal como está
+      if (/^\d{1,2}:\d{2}\s?(AM|PM|am|pm)$/.test(hora)) {
+        return hora;
+      }
+      // Si la hora está en formato HH:mm (24 horas), la convertimos a 12 horas
+      if (/^\d{2}:\d{2}$/.test(hora)) {
+        const [horas, minutos] = hora.split(':');
+        const horaNum = parseInt(horas);
+        const ampm = horaNum >= 12 ? 'PM' : 'AM';
+        const hora12 = horaNum === 0 ? 12 : (horaNum > 12 ? horaNum - 12 : horaNum);
+        return `${hora12.toString().padStart(2, '0')}:${minutos} ${ampm}`;
+      }
+      // Si es una fecha completa, extraemos solo la hora en formato 12 horas
+      const fecha = new Date(hora);
+      if (isNaN(fecha.getTime())) return 'N/A';
+      return fecha.toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      console.error('Error formateando hora:', error);
+      return 'N/A';
+    }
   };
 
-  const asistenciasFiltradas = asistencias.filter(asistencia => {
-    // Validar que la asistencia y persona existan
-    if (!asistencia || !asistencia.persona) {
+  const getAsistenciaColor = (tipo: string) => {
+    switch (tipo) {
+      case 'completa':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'entrada':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'sin_asistencia':
+      default:
+        return 'bg-red-100 text-red-800 border-red-200';
+    }
+  };
+
+  const asistenciasFiltradas = asistencias.filter(persona => {
+    // Validar que la persona exista
+    if (!persona) {
       return false;
     }
     
     // Filtro por búsqueda
     if (busqueda) {
       const searchTerm = busqueda.toLowerCase();
-      const nombreCompleto = `${asistencia.persona.nombre || ''} ${asistencia.persona.apellido || ''}`.toLowerCase();
-      const cedula = asistencia.persona.cedula?.toLowerCase() || '';
+      const nombreCompleto = `${persona.nombre || ''} ${persona.apellido || ''}`.toLowerCase();
+      const cedula = persona.cedula?.toLowerCase() || '';
       
       if (!nombreCompleto.includes(searchTerm) && !cedula.includes(searchTerm)) {
         return false;
@@ -342,39 +410,59 @@ const Asistencias: React.FC = () => {
             ) : asistenciasFiltradas.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Clock className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No hay asistencias registradas para esta fecha</p>
+                <p>No hay asistencias registradas para el {formatearFecha(filtroFecha)}</p>
+                <p className="text-sm mt-2">Usa el escáner NFC para registrar asistencias</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {asistenciasFiltradas.map((asistencia) => {
-                  // Validar que la asistencia y persona existan
-                  if (!asistencia || !asistencia.persona) {
+                {asistenciasFiltradas.map((persona) => {
+                  // Validar que la persona exista
+                  if (!persona) {
                     return null;
                   }
                   
+                  // Obtener información de asistencia
+                  const asistencia = persona.asistencia;
+                  if (!asistencia) {
+                    return null;
+                  }
+                  
+                  // Determinar el estado de asistencia
+                  const tieneEntrada = asistencia.tiene_entrada;
+                  const tieneSalida = asistencia.tiene_salida;
+                  const estadoAsistencia = tieneEntrada && tieneSalida ? 'completa' : 
+                                         tieneEntrada ? 'entrada' : 'sin_asistencia';
+                  
                   return (
                     <div 
-                      key={asistencia.id}
-                      className={`p-4 rounded-lg border ${getAsistenciaColor(asistencia.tipo)}`}
+                      key={persona.id}
+                      className={`p-4 rounded-lg border ${getAsistenciaColor(estadoAsistencia)}`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          {asistencia.tipo === 'entrada' ? (
+                          {estadoAsistencia === 'completa' ? (
                             <CheckCircle className="w-5 h-5 text-green-600" />
+                          ) : estadoAsistencia === 'entrada' ? (
+                            <Clock className="w-5 h-5 text-yellow-600" />
                           ) : (
                             <XCircle className="w-5 h-5 text-red-600" />
                           )}
                           <div>
                             <h4 className="font-semibold">
-                              {asistencia.persona.nombre || ''} {asistencia.persona.apellido || ''}
+                              {persona.nombre || ''} {persona.apellido || ''}
                             </h4>
-                            <p className="text-sm opacity-75 capitalize">
-                              {asistencia.tipo} - {formatearFecha(asistencia.fecha_hora)}
+                            <p className="text-sm opacity-75">
+                              {estadoAsistencia === 'completa' ? 
+                                `Entrada: ${formatearHora(asistencia.hora_entrada)} - Salida: ${formatearHora(asistencia.hora_salida)}` :
+                               estadoAsistencia === 'entrada' ? 
+                                `Entrada: ${formatearHora(asistencia.hora_entrada)}` :
+                               'Sin asistencia registrada'} - {asistencia.fecha}
                             </p>
                           </div>
                         </div>
-                        <Badge className={getAsistenciaColor(asistencia.tipo)}>
-                          {asistencia.tipo}
+                        <Badge className={getAsistenciaColor(estadoAsistencia)}>
+                          {estadoAsistencia === 'completa' ? 'Completa' :
+                           estadoAsistencia === 'entrada' ? 'Entrada' : 'Sin asistencia'}
                         </Badge>
                       </div>
                     </div>
@@ -425,9 +513,9 @@ const Asistencias: React.FC = () => {
             setPersonaDetectada(null);
           }}
           persona={personaDetectada}
-          onConfirm={() => handleConfirmarAsistencia('entrada')}
+          onConfirm={() => handleConfirmarAsistencia()}
           title="Confirmar Asistencia"
-          confirmText="Registrar Entrada"
+          confirmText="Registrar Asistencia"
           cancelText="Cancelar"
         />
       </div>
