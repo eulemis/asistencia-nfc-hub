@@ -1,0 +1,12 @@
+{
+  "name": "capacitor-nfc-uid-reader",
+  "version": "1.0.0",
+  "main": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "files": ["dist/"],
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  }
+}
