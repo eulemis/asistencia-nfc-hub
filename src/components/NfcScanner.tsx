@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Nfc, Loader2, CheckCircle, XCircle, Smartphone, Key } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { scanNfcTag, isNfcSupported, isNfcAvailable } from '@/lib/nfc-native';
+import { Capacitor } from '@capacitor/core';
 
 interface NfcScannerProps {
   isOpen: boolean;
@@ -26,17 +28,49 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
   const [manualUid, setManualUid] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
   const [nfcSupported, setNfcSupported] = useState(false);
+  const [nativeNfcSupported, setNativeNfcSupported] = useState(false);
+  const [isNative, setIsNative] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     // Verificar si NFC está disponible
-    const checkNfcSupport = () => {
-      const supported = 'NDEFReader' in window;
-      setNfcSupported(supported);
+    const checkNfcSupport = async () => {
+      const isNativePlatform = Capacitor.isNativePlatform();
+      setIsNative(isNativePlatform);
       
-      if (!supported) {
-        setError('NFC no está disponible en este dispositivo. Puedes ingresar el UID manualmente.');
-        setShowManualInput(true);
+      if (isNativePlatform) {
+        // Verificar soporte NFC nativo
+        try {
+          const nativeSupported = await isNfcSupported();
+          const nativeAvailable = await isNfcAvailable();
+          setNativeNfcSupported(nativeSupported && nativeAvailable);
+          setNfcSupported(nativeSupported && nativeAvailable);
+          
+          console.log('NFC nativo - Soportado:', nativeSupported, 'Disponible:', nativeAvailable);
+          
+          if (!nativeSupported) {
+            setError('NFC no está soportado en este dispositivo. Puedes ingresar el UID manualmente.');
+            setShowManualInput(true);
+          } else if (!nativeAvailable) {
+            setError('NFC no está habilitado. Activa NFC en la configuración de tu dispositivo.');
+            setShowManualInput(true);
+          }
+        } catch (error) {
+          console.error('Error verificando NFC nativo:', error);
+          setNativeNfcSupported(false);
+          setNfcSupported(false);
+          setError('Error verificando soporte NFC. Puedes ingresar el UID manualmente.');
+          setShowManualInput(true);
+        }
+      } else {
+        // Verificar soporte NFC Web
+        const webSupported = 'NDEFReader' in window;
+        setNfcSupported(webSupported);
+        
+        if (!webSupported) {
+          setError('NFC no está disponible en este dispositivo. Puedes ingresar el UID manualmente.');
+          setShowManualInput(true);
+        }
       }
     };
 
@@ -62,96 +96,132 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
       }
 
       console.log('Iniciando escaneo NFC...');
-      console.log('Navegador:', navigator.userAgent);
-      console.log('HTTPS:', window.location.protocol === 'https:');
+      console.log('Plataforma nativa:', isNative);
+      console.log('NFC nativo soportado:', nativeNfcSupported);
 
-      // @ts-ignore - NDEFReader es una API experimental
-      const ndef = new (window as any).NDEFReader();
-      
-      await ndef.scan();
-      console.log('Escaneo NFC iniciado correctamente');
-      
-      ndef.addEventListener('reading', (event: any) => {
-        console.log('Evento reading detectado:', event);
-        console.log('Propiedades del evento:', {
-          serialNumber: event.serialNumber,
-          message: event.message,
-          records: event.message?.records,
-          data: event.data,
-          type: event.type,
-          url: event.url
-        });
-
-        // Intentar obtener el UID de diferentes propiedades
-        let uid = null;
+      // Usar plugin nativo si estamos en plataforma móvil
+      if (isNative && nativeNfcSupported) {
+        console.log('Usando plugin NFC nativo...');
         
-        // Método 1: serialNumber directo
-        if (event.serialNumber) {
-          uid = event.serialNumber;
-          console.log('UID encontrado en serialNumber:', uid);
+        try {
+          const uid = await scanNfcTag();
+          
+          if (uid) {
+            setScannedUid(uid);
+            setIsScanning(false);
+            
+            console.log('UID capturado con plugin nativo:', uid);
+            
+            toast({
+              title: "NFC Detectado (Nativo)",
+              description: `UID: ${uid}`,
+            });
+          } else {
+            console.log('Plugin nativo no retornó UID');
+            setError('Se detectó la tarjeta NFC pero no se pudo leer el UID. Intenta de nuevo o ingresa el UID manualmente.');
+            setIsScanning(false);
+            setShowManualInput(true);
+          }
+        } catch (nativeError: any) {
+          console.error('Error con plugin NFC nativo:', nativeError);
+          setError(nativeError.message || 'Error con el escáner NFC nativo. Intenta de nuevo o ingresa el UID manualmente.');
+          setIsScanning(false);
+          setShowManualInput(true);
         }
-        // Método 2: buscar en los records
-        else if (event.message?.records) {
-          for (const record of event.message.records) {
-            console.log('Record encontrado:', record);
-            if (record.data) {
-              // Convertir ArrayBuffer a string hexadecimal
-              const dataView = new DataView(record.data);
-              const uidBytes = [];
-              for (let i = 0; i < Math.min(dataView.byteLength, 8); i++) {
-                uidBytes.push(dataView.getUint8(i).toString(16).padStart(2, '0'));
+      } else {
+        // Usar NFC Web API como fallback
+        console.log('Usando NFC Web API...');
+        console.log('Navegador:', navigator.userAgent);
+        console.log('HTTPS:', window.location.protocol === 'https:');
+
+        // @ts-ignore - NDEFReader es una API experimental
+        const ndef = new (window as any).NDEFReader();
+        
+        await ndef.scan();
+        console.log('Escaneo NFC Web iniciado correctamente');
+        
+        ndef.addEventListener('reading', (event: any) => {
+          console.log('Evento reading detectado:', event);
+          console.log('Propiedades del evento:', {
+            serialNumber: event.serialNumber,
+            message: event.message,
+            records: event.message?.records,
+            data: event.data,
+            type: event.type,
+            url: event.url
+          });
+
+          // Intentar obtener el UID de diferentes propiedades
+          let uid = null;
+          
+          // Método 1: serialNumber directo
+          if (event.serialNumber) {
+            uid = event.serialNumber;
+            console.log('UID encontrado en serialNumber:', uid);
+          }
+          // Método 2: buscar en los records
+          else if (event.message?.records) {
+            for (const record of event.message.records) {
+              console.log('Record encontrado:', record);
+              if (record.data) {
+                // Convertir ArrayBuffer a string hexadecimal
+                const dataView = new DataView(record.data);
+                const uidBytes = [];
+                for (let i = 0; i < Math.min(dataView.byteLength, 8); i++) {
+                  uidBytes.push(dataView.getUint8(i).toString(16).padStart(2, '0'));
+                }
+                uid = uidBytes.join('').toUpperCase();
+                console.log('UID extraído de record data:', uid);
+                break;
               }
-              uid = uidBytes.join('').toUpperCase();
-              console.log('UID extraído de record data:', uid);
-              break;
             }
           }
-        }
-        // Método 3: buscar en el data del evento
-        else if (event.data) {
-          const dataView = new DataView(event.data);
-          const uidBytes = [];
-          for (let i = 0; i < Math.min(dataView.byteLength, 8); i++) {
-            uidBytes.push(dataView.getUint8(i).toString(16).padStart(2, '0'));
+          // Método 3: buscar en el data del evento
+          else if (event.data) {
+            const dataView = new DataView(event.data);
+            const uidBytes = [];
+            for (let i = 0; i < Math.min(dataView.byteLength, 8); i++) {
+              uidBytes.push(dataView.getUint8(i).toString(16).padStart(2, '0'));
+            }
+            uid = uidBytes.join('').toUpperCase();
+            console.log('UID extraído de event.data:', uid);
           }
-          uid = uidBytes.join('').toUpperCase();
-          console.log('UID extraído de event.data:', uid);
-        }
 
-        if (uid && uid !== 'unknown') {
-          setScannedUid(uid);
-          setIsScanning(false);
-          
-          console.log('UID capturado exitosamente:', uid);
-          
-          toast({
-            title: "NFC Detectado",
-            description: `UID: ${uid}`,
-          });
-        } else {
-          console.log('No se pudo extraer UID válido del evento');
-          setError('Se detectó la tarjeta NFC pero no se pudo leer el UID. Intenta de nuevo o ingresa el UID manualmente.');
-          setIsScanning(false);
-          setShowManualInput(true);
-        }
-      });
+          if (uid && uid !== 'unknown') {
+            setScannedUid(uid);
+            setIsScanning(false);
+            
+            console.log('UID capturado exitosamente con Web API:', uid);
+            
+            toast({
+              title: "NFC Detectado (Web)",
+              description: `UID: ${uid}`,
+            });
+          } else {
+            console.log('No se pudo extraer UID válido del evento');
+            setError('Se detectó la tarjeta NFC pero no se pudo leer el UID. Intenta de nuevo o ingresa el UID manualmente.');
+            setIsScanning(false);
+            setShowManualInput(true);
+          }
+        });
 
-      ndef.addEventListener('readingerror', (error: any) => {
-        console.error('Error de lectura NFC:', error);
-        setError('Error al leer la tarjeta NFC. Intenta de nuevo o ingresa el UID manualmente.');
-        setIsScanning(false);
-        setShowManualInput(true);
-      });
-
-      // Agregar timeout para detectar si no se activa NFC
-      setTimeout(() => {
-        if (isScanning && !scannedUid && !error) {
-          console.log('Timeout: NFC no se activó en 10 segundos');
-          setError('No se detectó actividad NFC. Verifica que NFC esté activado y acerques la tarjeta al dispositivo.');
+        ndef.addEventListener('readingerror', (error: any) => {
+          console.error('Error de lectura NFC Web:', error);
+          setError('Error al leer la tarjeta NFC. Intenta de nuevo o ingresa el UID manualmente.');
           setIsScanning(false);
           setShowManualInput(true);
-        }
-      }, 10000);
+        });
+
+        // Agregar timeout para detectar si no se activa NFC
+        setTimeout(() => {
+          if (isScanning && !scannedUid && !error) {
+            console.log('Timeout: NFC Web no se activó en 10 segundos');
+            setError('No se detectó actividad NFC. Verifica que NFC esté activado y acerques la tarjeta al dispositivo.');
+            setIsScanning(false);
+            setShowManualInput(true);
+          }
+        }, 10000);
+      }
 
     } catch (err: any) {
       console.error('Error iniciando NFC scanner:', err);
@@ -352,9 +422,10 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
                   <CardContent className="p-4">
                     <h4 className="font-semibold text-blue-800 mb-2">Información de NFC</h4>
                     <div className="text-xs text-blue-700 space-y-1">
-                      <p><strong>Navegador:</strong> {navigator.userAgent.substring(0, 50)}...</p>
-                      <p><strong>Protocolo:</strong> {window.location.protocol}</p>
-                      <p><strong>NFC Web:</strong> {nfcSupported ? 'Sí' : 'No'}</p>
+                      <p><strong>Plataforma:</strong> {isNative ? 'Nativa' : 'Web'}</p>
+                      <p><strong>NFC Nativo:</strong> {nativeNfcSupported ? 'Sí' : 'No'}</p>
+                      <p><strong>NFC Web:</strong> {!isNative && nfcSupported ? 'Sí' : 'No'}</p>
+                      <p><strong>Método:</strong> {isNative && nativeNfcSupported ? 'Plugin @exxili/capacitor-nfc' : 'Web NFC API'}</p>
                       <p><strong>Estado:</strong> Escaneando...</p>
                     </div>
                     <div className="mt-3 text-xs text-blue-600">
