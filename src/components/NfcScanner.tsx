@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Nfc, Loader2, CheckCircle, XCircle, Smartphone, Key, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { scanNfcNative, isNfcAvailable, getNfcInfo, initNfcPlugin } from '@/lib/nfc-native';
+import { scanNfcNative, scanNfcWeb, isNfcAvailable, getNfcInfo, initNfcPlugin } from '@/lib/nfc-native';
 
 interface NfcScannerProps {
   isOpen: boolean;
@@ -24,6 +24,9 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [scannedUid, setScannedUid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [manualUid, setManualUid] = useState('');
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [nfcSupported, setNfcSupported] = useState(false);
   const [nativeNfcAvailable, setNativeNfcAvailable] = useState(false);
   const [nfcInfo, setNfcInfo] = useState<any>(null);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -38,6 +41,10 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
         const info = getNfcInfo();
         setNfcInfo(info);
         
+        // Verificar Web NFC
+        const webNfcSupported = 'NDEFReader' in window;
+        setNfcSupported(webNfcSupported);
+        
         // Inicializar y verificar NFC nativo
         try {
           console.log('Inicializando plugin NFC...');
@@ -49,9 +56,10 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
           setNativeNfcAvailable(false);
         }
         
-        // Solo mostrar error si realmente no hay NFC disponible
-        if (!nativeNfcAvailable) {
-          setError('NFC no está disponible en este dispositivo.');
+        // Si no hay NFC disponible, mostrar opción manual
+        if (!webNfcSupported && !nativeNfcAvailable) {
+          setError('NFC no está disponible en este dispositivo. Puedes ingresar el UID manualmente.');
+          setShowManualInput(true);
         }
       } catch (error) {
         console.error('Error verificando capacidades NFC:', error);
@@ -65,12 +73,60 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isOpen && nativeNfcAvailable) {
+    if (isOpen && (nfcSupported || nativeNfcAvailable)) {
       // No iniciar automáticamente, esperar que el usuario elija
     } else if (!isOpen) {
       stopScanning();
     }
-  }, [isOpen, nativeNfcAvailable]);
+  }, [isOpen, nfcSupported, nativeNfcAvailable]);
+
+  const startWebScanning = async () => {
+    try {
+      setIsScanning(true);
+      setError(null);
+      setScannedUid(null);
+
+      if (!nfcSupported) {
+        throw new Error('NFC Web no está disponible en este dispositivo');
+      }
+
+      console.log('Iniciando escaneo NFC Web...');
+      
+      const uid = await scanNfcWeb();
+      
+      if (uid) {
+        setScannedUid(uid);
+        setIsScanning(false);
+        
+        console.log('UID capturado exitosamente con Web NFC:', uid);
+        
+        toast({
+          title: "NFC Detectado",
+          description: `UID: ${uid}`,
+        });
+      } else {
+        setError('No se pudo leer el UID de la tarjeta NFC. Intenta de nuevo.');
+        setIsScanning(false);
+      }
+
+    } catch (err: any) {
+      console.error('Error iniciando NFC Web scanner:', err);
+      
+      let errorMessage = 'Error al iniciar el escáner NFC Web';
+      if (err.message.includes('permission')) {
+        errorMessage = 'Permiso denegado para NFC. Verifica que NFC esté activado en tu dispositivo.';
+      } else if (err.message.includes('not supported')) {
+        errorMessage = 'NFC Web no está disponible en este dispositivo.';
+      } else if (err.message.includes('HTTPS')) {
+        errorMessage = 'NFC Web requiere HTTPS. La app debe estar en un servidor seguro.';
+      } else if (err.message.includes('Tiempo de espera')) {
+        errorMessage = 'No se detectó actividad NFC. Verifica que NFC esté activado y acerques la tarjeta al dispositivo.';
+      }
+      
+      setError(errorMessage);
+      setIsScanning(false);
+    }
+  };
 
   const startNativeScanning = async () => {
     try {
@@ -116,18 +172,29 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
   };
 
   const handleConfirm = () => {
-    const uidToUse = scannedUid;
+    const uidToUse = scannedUid || manualUid;
     if (uidToUse && uidToUse.trim()) {
       onNfcDetected(uidToUse.trim());
       onClose();
     } else {
-      setError('Por favor, escanea una tarjeta NFC.');
+      setError('Por favor, ingresa un UID válido');
     }
   };
 
   const handleRetry = () => {
     setError(null);
     setScannedUid(null);
+    setManualUid('');
+    setShowManualInput(false);
+  };
+
+  const handleManualSubmit = () => {
+    if (manualUid && manualUid.trim()) {
+      onNfcDetected(manualUid.trim());
+      onClose();
+    } else {
+      setError('Por favor, ingresa un UID válido');
+    }
   };
 
   // Función para manejar errores de NFC ya vinculado
@@ -221,7 +288,7 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
                 </div>
               )}
 
-              {error && (
+              {error && !showManualInput && (
                 <div className="space-y-4">
                   <XCircle className="w-12 h-12 mx-auto text-red-500" />
                   <div>
@@ -232,11 +299,39 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
                     <Button onClick={handleRetry} variant="outline" className="flex-1">
                       Reintentar
                     </Button>
+                    <Button onClick={() => setShowManualInput(true)} variant="outline" className="flex-1">
+                      Ingresar Manualmente
+                    </Button>
                   </div>
                 </div>
               )}
 
-              {!isInitializing && !isScanning && !scannedUid && !error && nativeNfcAvailable && (
+              {showManualInput && (
+                <div className="space-y-4">
+                  <Key className="w-12 h-12 mx-auto text-blue-500" />
+                  <div>
+                    <h3 className="font-semibold">Ingresar UID Manualmente</h3>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Ingresa el código UID de la tarjeta NFC
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-uid">UID de la Tarjeta NFC</Label>
+                    <Input
+                      id="manual-uid"
+                      placeholder="Ej: 04A3B2C1D4E5F6"
+                      value={manualUid}
+                      onChange={(e) => setManualUid(e.target.value)}
+                      className="text-center font-mono"
+                    />
+                  </div>
+                  <Button onClick={handleManualSubmit} className="w-full">
+                    Vincular NFC
+                  </Button>
+                </div>
+              )}
+
+              {!isInitializing && !isScanning && !scannedUid && !error && !showManualInput && (
                 <div className="space-y-4">
                   <Nfc className="w-12 h-12 mx-auto text-blue-500" />
                   <div>
@@ -246,23 +341,28 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Button onClick={startNativeScanning} className="w-full bg-blue-500 hover:bg-blue-600">
-                      <Zap className="w-4 h-4 mr-2" />
-                      NFC Nativo
-                    </Button>
+                    {nativeNfcAvailable && (
+                      <Button onClick={startNativeScanning} className="w-full bg-blue-500 hover:bg-blue-600">
+                        <Zap className="w-4 h-4 mr-2" />
+                        NFC Nativo
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
 
-              {!isInitializing && !nativeNfcAvailable && (
+              {!isInitializing && !nfcSupported && !nativeNfcAvailable && !showManualInput && (
                 <div className="space-y-4">
                   <Smartphone className="w-12 h-12 mx-auto text-orange-500" />
                   <div>
                     <h3 className="font-semibold">NFC No Disponible</h3>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Tu dispositivo no soporta NFC. No puedes escanear tarjetas.
+                      Tu dispositivo no soporta NFC. Puedes ingresar el UID manualmente.
                     </p>
                   </div>
+                  <Button onClick={() => setShowManualInput(true)} className="w-full">
+                    Ingresar UID Manualmente
+                  </Button>
                 </div>
               )}
 
@@ -274,7 +374,10 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
                     <div className="text-xs text-blue-700 space-y-1">
                       <p><strong>Plataforma:</strong> {nfcInfo.platform}</p>
                       <p><strong>Nativo:</strong> {nfcInfo.isNative ? 'Sí' : 'No'}</p>
+                      <p><strong>NFC Web:</strong> {nfcSupported ? 'Sí' : 'No'}</p>
                       <p><strong>NFC Nativo:</strong> {nativeNfcAvailable ? 'Sí' : 'No'}</p>
+                      <p><strong>Plugin NFC:</strong> {nfcInfo.nfcPluginLoaded ? 'Sí' : 'No'}</p>
+                      <p><strong>Métodos Plugin:</strong> {nfcInfo.nfcPluginMethods?.join(', ') || 'N/A'}</p>
                       <p><strong>HTTPS:</strong> {nfcInfo.https ? 'Sí' : 'No'}</p>
                       <p><strong>Estado:</strong> {isScanning ? 'Escaneando...' : isInitializing ? 'Inicializando...' : 'Listo'}</p>
                     </div>
@@ -284,7 +387,7 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
                         <li>Asegúrate de que NFC esté activado en tu dispositivo</li>
                         <li>Acerca la tarjeta NFC a la parte trasera del teléfono</li>
                         <li>Mantén la tarjeta cerca por 2-3 segundos</li>
-                        <li>Esta app solo funciona con NFC nativo en Android</li>
+                        <li>Web NFC es más confiable en Chrome Android</li>
                       </ul>
                     </div>
                   </CardContent>
@@ -297,7 +400,7 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
             <Button variant="outline" onClick={onClose} className="flex-1">
               Cancelar
             </Button>
-            {scannedUid && (
+            {(scannedUid || manualUid) && (
               <Button onClick={handleConfirm} className="flex-1">
                 Vincular NFC
               </Button>

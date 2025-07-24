@@ -20,17 +20,9 @@ export const isNfcAvailable = async (): Promise<boolean> => {
     if (Capacitor.isNativePlatform()) {
       console.log('Verificando NFC nativo en Android...');
       
-      try {
-        // Verificar si NFC está habilitado usando el plugin
-        const { registerPlugin } = await import('@capacitor/core');
-        const NFCPlug = registerPlugin('NFC') as any;
-        const result = await NFCPlug.isSupported();
-        console.log('NFC está soportado:', result.supported);
-        return result.supported;
-      } catch (error) {
-        console.log('Error verificando si NFC está habilitado:', error);
-        return false;
-      }
+      // Por ahora, asumimos que NFC está disponible en Android
+      // Esto se actualizará cuando instales el nuevo plugin
+      return true;
     }
     
     // En web, no soportamos NFC
@@ -42,100 +34,77 @@ export const isNfcAvailable = async (): Promise<boolean> => {
   }
 };
 
-// Función para escanear NFC usando @exxili/capacitor-nfc
+// Función para escanear NFC (placeholder para el nuevo plugin)
 export const scanNfcNative = async (): Promise<string> => {
-  return new Promise(async (resolve, reject) => {
+  return new Promise((resolve, reject) => {
     if (!Capacitor.isNativePlatform()) {
       reject(new Error('NFC nativo solo está disponible en Android'));
       return;
     }
 
+    reject(new Error('Plugin NFC no instalado. Por favor, instala el plugin que te dio ChatGPT.'));
+  });
+};
+
+// Función para escanear NFC Web (fallback)
+export const scanNfcWeb = async (): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (!('NDEFReader' in window)) {
+      reject(new Error('Web NFC API no está disponible'));
+      return;
+    }
+
+    console.log('Iniciando escaneo Web NFC...');
+    
     try {
-      console.log('Iniciando escaneo NFC con implementación directa...');
+      const ndef = new (window as any).NDEFReader();
       
-      // Importar el plugin directamente
-      const { registerPlugin } = await import('@capacitor/core');
-      const NFCPlug = registerPlugin('NFC') as any;
-      
-      console.log('Plugin NFC registrado:', NFCPlug);
-      
-      // Configurar timeout para evitar que se quede colgado
-      const timeout = setTimeout(() => {
-        console.log('Timeout del escaneo NFC - no se detectó ninguna tarjeta');
-        reject(new Error('Tiempo de espera agotado. No se detectó ninguna tarjeta NFC.'));
-      }, 30000); // 30 segundos de timeout
-      
-      // Configurar listener directo para nfcTag
-      console.log('Configurando listener directo para nfcTag...');
-      
-      const tagListener = (data: any) => {
-        console.log('=== DATOS NFC RECIBIDOS (DIRECTO) ===');
-        console.log('Datos NFC recibidos:', data);
-        console.log('Tipo de datos:', typeof data);
-        console.log('Estructura de datos:', JSON.stringify(data, null, 2));
-        console.log('=====================================');
-        
-        // Limpiar timeout ya que recibimos datos
-        clearTimeout(timeout);
-        
-        // Extraer UID de los datos del tag
-        let uid = null;
-        
-        // Intentar extraer UID de diferentes ubicaciones
-        if (data && data.uid) {
-          uid = formatUID(data.uid);
-          console.log('UID encontrado en data.uid:', uid);
-        } else if (data && data.tagId) {
-          uid = formatUID(data.tagId);
-          console.log('UID encontrado en data.tagId:', uid);
-        } else if (data && data.messages && data.messages.length > 0) {
-          // Intentar extraer UID de los mensajes NDEF
-          const firstMessage = data.messages[0];
-          if (firstMessage && firstMessage.records && firstMessage.records.length > 0) {
-            const firstRecord = firstMessage.records[0];
-            if (firstRecord && firstRecord.payload) {
-              // Decodificar el payload para obtener el UID
-              try {
-                const decodedPayload = atob(firstRecord.payload);
-                uid = formatUID(decodedPayload);
-                console.log('UID encontrado en payload decodificado:', uid);
-              } catch (e) {
-                console.log('Error decodificando payload:', e);
+      ndef.scan()
+        .then(() => {
+          console.log('Escaneo Web NFC iniciado correctamente');
+          
+          ndef.addEventListener('reading', (event: any) => {
+            console.log('NFC detectado:', event);
+            
+            try {
+              let uid = null;
+              
+              // Buscar UID en diferentes propiedades
+              if (event.serialNumber) {
+                uid = formatUID(event.serialNumber);
+              } else if (event.id) {
+                uid = formatUID(event.id);
+              } else if (event.uid) {
+                uid = formatUID(event.uid);
               }
+              
+              if (uid) {
+                console.log('UID capturado exitosamente con Web NFC:', uid);
+                resolve(uid);
+              } else {
+                console.log('No se pudo extraer UID de los datos NFC');
+                reject(new Error('No se pudo extraer UID de la tarjeta NFC'));
+              }
+              
+            } catch (error) {
+              console.error('Error procesando datos NFC:', error);
+              reject(error);
             }
-          }
-        }
+          });
+          
+          ndef.addEventListener('readingerror', (error: any) => {
+            console.error('Error iniciando Web NFC scanner:', error);
+            reject(error);
+          });
+          
+        })
+        .catch((error: any) => {
+          console.error('Error iniciando Web NFC scanner:', error);
+          reject(error);
+        });
         
-        if (uid) {
-          console.log('UID detectado (real):', uid);
-          // Limpiar listeners antes de resolver
-          NFCPlug.removeAllListeners('nfcTag');
-          resolve(uid);
-        } else {
-          console.log('No se pudo extraer UID de los datos NFC');
-          console.log('Datos completos recibidos:', data);
-          NFCPlug.removeAllListeners('nfcTag');
-          reject(new Error('No se pudo leer el UID de la tarjeta NFC'));
-        }
-      };
-
-      // Configurar listener para errores
-      console.log('Configurando listener para nfcError...');
-      const errorListener = (error: any) => {
-        console.error('Error NFC:', error);
-        clearTimeout(timeout);
-        NFCPlug.removeAllListeners('nfcError');
-        reject(new Error(error.message || 'Error al leer tarjeta NFC'));
-      };
-
-      // Registrar los listeners directamente
-      NFCPlug.addListener('nfcTag', tagListener);
-      NFCPlug.addListener('nfcError', errorListener);
-
-      console.log('Escaneo NFC configurado directamente. Acerca una tarjeta NFC al dispositivo...');
-
     } catch (error) {
-      console.error('Error iniciando escaneo NFC:', error);
+      console.error('Error configurando Web NFC:', error);
       reject(error);
     }
   });
@@ -146,7 +115,7 @@ export const getNfcInfo = () => {
   return {
     platform: Capacitor.getPlatform(),
     isNative: Capacitor.isNativePlatform(),
-    webNfcAvailable: false, // No soportamos Web NFC
+    webNfcAvailable: 'NDEFReader' in window,
     userAgent: navigator.userAgent,
     https: location.protocol === 'https:',
     hostname: location.hostname
