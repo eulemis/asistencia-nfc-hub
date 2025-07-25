@@ -8,6 +8,7 @@ import { Search, Filter, Loader2, Users } from 'lucide-react';
 import api from '@/lib/axios';
 import { Persona } from '@/types';
 import PersonaCard from '@/components/PersonaCard';
+import { fetchGrupos, Grupo } from '@/lib/grupos';
 import NfcScanner from '@/components/NfcScanner';
 import FiltroEdad from '@/components/FiltroEdad';
 import LoadingOverlay from '@/components/ui/loading-overlay';
@@ -15,6 +16,19 @@ import Navigation from '@/components/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Personas: React.FC = () => {
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
+  // Cargar grupos al montar
+  useEffect(() => {
+    const cargarGrupos = async () => {
+      try {
+        const data = await fetchGrupos();
+        setGrupos(data);
+      } catch (e) {
+        setGrupos([]);
+      }
+    };
+    cargarGrupos();
+  }, []);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -59,9 +73,12 @@ const Personas: React.FC = () => {
         setLoadingMore(true);
       }
 
+
+      // Si es un reset (búsqueda/filtro), siempre usar página 1
+      const pageToUse = reset ? 1 : currentPage;
       const params = new URLSearchParams({
         tipo: filtroTipo,
-        page: currentPage.toString(),
+        page: pageToUse.toString(),
       });
 
       if (filtroEdad !== 'sin-filtro') {
@@ -105,7 +122,12 @@ const Personas: React.FC = () => {
       }
 
       setHasMore(paginationData.current_page < paginationData.last_page);
-      setCurrentPage(paginationData.current_page + 1);
+      // Solo incrementar la página si no es reset (scroll o "ver más")
+      if (!reset) {
+        setCurrentPage(paginationData.current_page + 1);
+      } else {
+        setCurrentPage(2); // Si fue reset, la próxima será la página 2
+      }
     } catch (error) {
       console.error('Error cargando personas:', error);
       toast({
@@ -267,8 +289,11 @@ const Personas: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos los grupos</SelectItem>
-                  <SelectItem value="1">Grupo 1</SelectItem>
-                  <SelectItem value="2">Grupo 2</SelectItem>
+                  {grupos.map((grupo) => (
+                    <SelectItem key={grupo.id} value={String(grupo.id)}>
+                      {grupo.nombre}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               

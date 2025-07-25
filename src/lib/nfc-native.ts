@@ -36,40 +36,48 @@ export const isNfcAvailable = async (): Promise<boolean> => {
 
 // Función para escanear NFC (placeholder para el nuevo plugin)
 export const scanNfcNative = async (): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    if (!Capacitor.isNativePlatform()) {
-      reject(new Error('NFC nativo solo está disponible en Android'));
-      return;
+  if (!Capacitor.isNativePlatform()) {
+    console.error('[NFC] El dispositivo no es Android/iOS nativo.');
+    throw new Error('NFC nativo solo está disponible en dispositivos Android/iOS reales.');
+  }
+  try {
+    // Intentar obtener el plugin desde Capacitor
+    // @ts-expect-error: Acceso dinámico a plugin nativo
+    const NfcUidReader = (window as any).Capacitor?.Plugins?.NfcUidReader || (typeof require !== 'undefined' ? require('capacitor-nfc-uid-reader').default : undefined);
+    if (!NfcUidReader || !NfcUidReader.startReading) {
+      console.error('[NFC] Plugin capacitor-nfc-uid-reader no está disponible o no tiene startReading.');
+      throw new Error('El plugin capacitor-nfc-uid-reader no está disponible. ¿Sincronizaste y compilaste el proyecto?');
     }
-
-    reject(new Error('Plugin NFC no instalado. Por favor, instala el plugin que te dio ChatGPT.'));
-  });
+    console.log('[NFC] Iniciando lectura de UID con plugin nativo...');
+    const { uid } = await NfcUidReader.startReading();
+    console.log('[NFC] UID leído correctamente:', uid);
+    return formatUID(uid);
+  } catch (error) {
+    console.error('[NFC] Error leyendo UID:', error);
+    throw new Error('Error leyendo NFC UID: ' + (error?.message || String(error)));
+  }
 };
 
 // Función para escanear NFC Web (fallback)
 export const scanNfcWeb = async (): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (!('NDEFReader' in window)) {
-      reject(new Error('Web NFC API no está disponible'));
+      console.error('[WebNFC] Web NFC API no está disponible en este navegador.');
+      reject(new Error('Web NFC API no está disponible en este navegador.'));
       return;
     }
 
-    console.log('Iniciando escaneo Web NFC...');
-    
+    console.log('[WebNFC] Iniciando escaneo Web NFC...');
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ndef = new (window as any).NDEFReader();
-      
       ndef.scan()
         .then(() => {
-          console.log('Escaneo Web NFC iniciado correctamente');
-          
+          console.log('[WebNFC] Escaneo Web NFC iniciado correctamente');
           ndef.addEventListener('reading', (event: any) => {
-            console.log('NFC detectado:', event);
-            
+            console.log('[WebNFC] NFC detectado:', event);
             try {
               let uid = null;
-              
-              // Buscar UID en diferentes propiedades
               if (event.serialNumber) {
                 uid = formatUID(event.serialNumber);
               } else if (event.id) {
@@ -77,34 +85,29 @@ export const scanNfcWeb = async (): Promise<string> => {
               } else if (event.uid) {
                 uid = formatUID(event.uid);
               }
-              
               if (uid) {
-                console.log('UID capturado exitosamente con Web NFC:', uid);
+                console.log('[WebNFC] UID capturado exitosamente:', uid);
                 resolve(uid);
               } else {
-                console.log('No se pudo extraer UID de los datos NFC');
-                reject(new Error('No se pudo extraer UID de la tarjeta NFC'));
+                console.warn('[WebNFC] No se pudo extraer UID de los datos NFC');
+                reject(new Error('No se pudo extraer UID de la tarjeta NFC.'));
               }
-              
             } catch (error) {
-              console.error('Error procesando datos NFC:', error);
+              console.error('[WebNFC] Error procesando datos NFC:', error);
               reject(error);
             }
           });
-          
           ndef.addEventListener('readingerror', (error: any) => {
-            console.error('Error iniciando Web NFC scanner:', error);
+            console.error('[WebNFC] Error durante el escaneo NFC:', error);
             reject(error);
           });
-          
         })
         .catch((error: any) => {
-          console.error('Error iniciando Web NFC scanner:', error);
+          console.error('[WebNFC] Error iniciando Web NFC scanner:', error);
           reject(error);
         });
-        
     } catch (error) {
-      console.error('Error configurando Web NFC:', error);
+      console.error('[WebNFC] Error configurando Web NFC:', error);
       reject(error);
     }
   });

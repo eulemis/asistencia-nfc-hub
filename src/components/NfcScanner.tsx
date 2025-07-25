@@ -299,9 +299,12 @@ const NfcScanner: React.FC<NfcScannerProps> = ({
                     <Button onClick={handleRetry} variant="outline" className="flex-1">
                       Reintentar
                     </Button>
-                    <Button onClick={() => setShowManualInput(true)} variant="outline" className="flex-1">
-                      Ingresar Manualmente
-                    </Button>
+                    {/* Solo mostrar la opción manual si NO hay NFC disponible */}
+                    {(!nfcSupported && !nativeNfcAvailable) && (
+                      <Button onClick={() => setShowManualInput(true)} variant="outline" className="flex-1">
+                        Ingresar Manualmente
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
